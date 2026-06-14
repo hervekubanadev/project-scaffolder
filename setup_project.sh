@@ -106,3 +106,23 @@ sed -i "s/\"failure\": [0-9]*/\"failure\": $FAILURE/" "$JSON_FILE"
 
 echo "✔ Configuration updated successfully"
 
+
+echo "🛡️ Setting up interrupt handler (Ctrl + C)..."
+
+cleanup() {
+  echo ""
+  echo "⚠️ Interrupt detected. Creating backup archive..."
+
+  ARCHIVE_NAME="${BASE_DIR}_archive"
+
+  tar -czf "${ARCHIVE_NAME}.tar.gz" "$BASE_DIR"
+
+  rm -rf "$BASE_DIR"
+
+  echo "✅ Backup created: ${ARCHIVE_NAME}.tar.gz"
+  echo "⚠️  Incomplete directory removed"
+  exit 1
+}
+
+trap cleanup SIGINT
+
