@@ -96,3 +96,13 @@ if (( FAILURE >= WARNING )); then
 fi
 
 echo "✅ Inputs validated successfully"
+
+echo " ✅ Updating configuration file with new thresholds..."
+
+JSON_FILE="$BASE_DIR/Helpers/config.json"
+
+sed -i "s/\"warning\": [0-9]*/\"warning\": $WARNING/" "$JSON_FILE"
+sed -i "s/\"failure\": [0-9]*/\"failure\": $FAILURE/" "$JSON_FILE"
+
+echo "✔ Configuration updated successfully"
+
