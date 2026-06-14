@@ -1,51 +1,76 @@
 #!/bin/bash
 
+# =========================
+# COLORS (STRICT UI SYSTEM)
+# =========================
 GREEN="\033[0;32m"
 RED="\033[0;31m"
+YELLOW="\033[1;33m"
+BLUE="\033[0;34m"
 NC="\033[0m"
 
+# =========================
+# UI FUNCTIONS
+# =========================
 error() {
     echo ""
     echo -e "${RED}❌ ERROR: $1${NC}"
-    echo "→ Problem: $2"
-    echo "→ Fix: $3"
+    echo -e "${RED}→ Problem: $2${NC}"
+    echo -e "${RED}→ Fix: $3${NC}"
     echo ""
     exit 1
 }
 
+success() {
+    echo -e "${GREEN}✅ $1${NC}"
+}
+
+info() {
+    echo -e "${BLUE}ℹ $1${NC}"
+}
+
+# =========================
+# HEADER
+# =========================
+echo ""
+echo -e "${BLUE}======================================${NC}"
+echo -e "${BLUE}  ATTENDANCE TRACKER BOOTSTRAPPER    ${NC}"
+echo -e "${BLUE}======================================${NC}"
+echo ""
+
+# =========================
+# INPUT
+# =========================
 read -p "Enter project suffix: " PROJECT_NAME
 
 if [[ -z "$PROJECT_NAME" ]]; then
-    error \
-    "Missing project name" \
-    "No project suffix was provided" \
-    "Enter a valid suffix such as student1"
+    error "Missing project name" "No input provided" "Enter a valid suffix like student1"
 fi
 
 BASE_DIR="attendance_tracker_${PROJECT_NAME}"
 
 if [[ -d "$BASE_DIR" ]]; then
-    error \
-    "Project already exists" \
-    "Directory '$BASE_DIR' already exists" \
-    "Use a different suffix or remove the existing directory"
+    error "Project exists" "Directory already exists" "Delete it or choose another name"
 fi
 
+# =========================
+# CLEANUP ON CTRL + C
+# =========================
 cleanup() {
     echo ""
-    echo "❌ Interrupt detected. Creating backup archive..."
+    echo -e "${YELLOW}⚠ Interrupt detected... creating backup${NC}"
 
     ARCHIVE_NAME="${BASE_DIR}_archive"
 
     if [[ -d "$BASE_DIR" ]]; then
-        tar -czf "${ARCHIVE_NAME}.tar.gz" "$BASE_DIR"
+        tar -czf "${ARCHIVE_NAME}.tar.gz" "$BASE_DIR" >/dev/null 2>&1
 
         if [[ $? -eq 0 ]]; then
             rm -rf "$BASE_DIR"
-            echo "✅ Backup created: ${ARCHIVE_NAME}.tar.gz"
-            echo "❌ Incomplete project removed"
+            success "Backup created: ${ARCHIVE_NAME}.tar.gz"
+            success "Cleanup completed"
         else
-            echo "❌ Failed to create backup archive"
+            error "Backup failed" "tar error" "Check disk space"
         fi
     fi
 
@@ -54,37 +79,36 @@ cleanup() {
 
 trap cleanup SIGINT
 
+# =========================
+# ENVIRONMENT CHECK
+# =========================
 echo ""
-echo "================================================="
-echo "1. ENVIRONMENT CHECK"
-echo "================================================="
+echo -e "${BLUE}[1/5] ENVIRONMENT CHECK${NC}"
 
 if ! python3 --version >/dev/null 2>&1; then
-    error \
-    "Python3 not found" \
-    "python3 command is unavailable on this system" \
-    "Install Python3 and run the script again"
+    error "Python3 missing" "python3 not installed" "Install Python3 first"
 fi
 
-echo "✅ Python3 detected"
+success "Python3 detected"
 
+# =========================
+# STRUCTURE CREATION
+# =========================
 echo ""
-echo "================================================="
-echo "2. PROJECT STRUCTURE"
-echo "================================================="
+echo -e "${BLUE}[2/5] CREATING STRUCTURE${NC}"
 
-mkdir -p "$BASE_DIR/Helpers" "$BASE_DIR/reports" || \
-error \
-"Directory creation failed" \
-"Unable to create required project folders" \
-"Check permissions and available disk space"
+mkdir -p "$BASE_DIR/Helpers" "$BASE_DIR/reports"
+if [[ $? -ne 0 ]]; then
+    error "Folder creation failed" "Permission denied or invalid path" "Try different directory"
+fi
 
-echo "✅ Project structure created"
+success "Project structure created"
 
+# =========================
+# FILE GENERATION
+# =========================
 echo ""
-echo "================================================="
-echo "3. FILE GENERATION"
-echo "================================================="
+echo -e "${BLUE}[3/5] GENERATING FILES${NC}"
 
 cat <<CSV > "$BASE_DIR/Helpers/assets.csv"
 Email,Names,Attendance Count,Absence Count
@@ -105,7 +129,7 @@ cat <<JSON > "$BASE_DIR/Helpers/config.json"
 }
 JSON
 
-cat <<'PYTHON' > "$BASE_DIR/attendance_checker.py"
+cat <<'PY' > "$BASE_DIR/attendance_checker.py"
 import csv
 import json
 import os
@@ -123,168 +147,113 @@ def run_attendance_check():
             f'reports/reports_{timestamp}.log.archive'
         )
 
-    with open('Helpers/assets.csv', 'r') as f, \
-         open('reports/reports.log', 'w') as log:
-
+    with open('Helpers/assets.csv', 'r') as f, open('reports/reports.log', 'w') as log:
         reader = csv.DictReader(f)
-        total_sessions = config['total_sessions']
+        total = config['total_sessions']
 
-        log.write(
-            f"--- Attendance Report Run: {datetime.now()} ---\n"
-        )
+        log.write(f"--- Attendance Report {datetime.now()} ---\n")
 
         for row in reader:
-
             name = row['Names']
             email = row['Email']
             attended = int(row['Attendance Count'])
 
-            attendance_pct = (
-                attended / total_sessions
-            ) * 100
+            pct = (attended / total) * 100
 
             message = ""
 
-            if attendance_pct < config['thresholds']['failure']:
-                message = (
-                    f"URGENT: {name}, your attendance is "
-                    f"{attendance_pct:.1f}%. "
-                    f"You will fail this class."
-                )
-
-            elif attendance_pct < config['thresholds']['warning']:
-                message = (
-                    f"WARNING: {name}, your attendance is "
-                    f"{attendance_pct:.1f}%. "
-                    f"Please be careful."
-                )
+            if pct < config['thresholds']['failure']:
+                message = f"URGENT: {name} FAIL RISK ({pct:.1f}%)"
+            elif pct < config['thresholds']['warning']:
+                message = f"WARNING: {name} LOW ATTENDANCE ({pct:.1f}%)"
 
             if message:
-
                 if config['run_mode'] == "live":
-
-                    log.write(
-                        f"[{datetime.now()}] "
-                        f"ALERT SENT TO {email}: "
-                        f"{message}\n"
-                    )
-
-                    print(f"Logged alert for {name}")
-
+                    log.write(f"[{datetime.now()}] {email}: {message}\n")
+                    print(f"Logged: {name}")
                 else:
-
-                    print(
-                        f"[DRY RUN] Email to "
-                        f"{email}: {message}"
-                    )
+                    print(f"[DRY RUN] {email}: {message}")
 
 if __name__ == "__main__":
     run_attendance_check()
-PYTHON
+PY
 
-touch "$BASE_DIR/reports/reports.log" || \
-error \
-"Report file creation failed" \
-"Unable to create reports.log" \
-"Check permissions"
+success "All project files created"
 
-echo "✅ Files created successfully"
-
+# =========================
+# CONFIG UPDATE
+# =========================
 echo ""
-echo "================================================="
-echo "4. CONFIGURATION"
-echo "================================================="
+echo -e "${BLUE}[4/5] CONFIGURATION${NC}"
 
 read -p "Warning threshold (default 75): " WARNING
 read -p "Failure threshold (default 50): " FAILURE
 
-WARNING=${WARNING:-75}
-FAILURE=${FAILURE:-50}
+if [[ -z "$WARNING" ]]; then WARNING=75; fi
+if [[ -z "$FAILURE" ]]; then FAILURE=50; fi
 
 if ! [[ "$WARNING" =~ ^[0-9]+$ ]]; then
-    error \
-    "Invalid warning threshold" \
-    "Value '$WARNING' is not numeric" \
-    "Enter a number between 0 and 100"
+    error "Invalid warning" "Not numeric" "Enter 0-100"
 fi
 
 if ! [[ "$FAILURE" =~ ^[0-9]+$ ]]; then
-    error \
-    "Invalid failure threshold" \
-    "Value '$FAILURE' is not numeric" \
-    "Enter a number between 0 and 100"
-fi
-
-if (( WARNING < 0 || WARNING > 100 )); then
-    error \
-    "Warning threshold out of range" \
-    "Value must be between 0 and 100" \
-    "Choose a valid percentage"
-fi
-
-if (( FAILURE < 0 || FAILURE > 100 )); then
-    error \
-    "Failure threshold out of range" \
-    "Value must be between 0 and 100" \
-    "Choose a valid percentage"
+    error "Invalid failure" "Not numeric" "Enter 0-100"
 fi
 
 if (( FAILURE >= WARNING )); then
-    error \
-    "Invalid threshold logic" \
-    "Failure threshold must be lower than warning threshold" \
-    "Example: Warning=75 and Failure=50"
+    error "Logic error" "Failure must be less than warning" "Example: 50 < 75"
 fi
-
-echo "✅ Configuration validated"
 
 JSON_FILE="$BASE_DIR/Helpers/config.json"
 
-sed -i "s/\"warning\": [0-9]*/\"warning\": $WARNING/" "$JSON_FILE" || \
-error \
-"Configuration update failed" \
-"Unable to update warning threshold" \
-"Check config.json"
+if [[ "$(uname)" == "Darwin" ]]; then
+    sed -i '' "s/\"warning\": [0-9]*/\"warning\": $WARNING/" "$JSON_FILE"
+    sed -i '' "s/\"failure\": [0-9]*/\"failure\": $FAILURE/" "$JSON_FILE"
+else
+    sed -i "s/\"warning\": [0-9]*/\"warning\": $WARNING/" "$JSON_FILE"
+    sed -i "s/\"failure\": [0-9]*/\"failure\": $FAILURE/" "$JSON_FILE"
+fi
 
-sed -i "s/\"failure\": [0-9]*/\"failure\": $FAILURE/" "$JSON_FILE" || \
-error \
-"Configuration update failed" \
-"Unable to update failure threshold" \
-"Check config.json"
+success "Configuration updated"
 
-echo "✅ Configuration updated"
-
+# =========================
+# VALIDATION
+# =========================
 echo ""
-echo "================================================="
-echo "5. STRUCTURE VALIDATION"
-echo "================================================="
+echo -e "${BLUE}[5/5] VALIDATION${NC}"
 
-[[ -f "$BASE_DIR/attendance_checker.py" ]] || \
-error "Validation failed" "attendance_checker.py is missing" "Check file generation"
+if [[ ! -f "$BASE_DIR/attendance_checker.py" ]]; then
+    error "Missing file" "attendance_checker.py not found" "Check generation step"
+fi
 
-[[ -f "$BASE_DIR/Helpers/assets.csv" ]] || \
-error "Validation failed" "assets.csv is missing" "Check file generation"
+if [[ ! -f "$BASE_DIR/Helpers/assets.csv" ]]; then
+    error "Missing file" "assets.csv not found" "Check generation step"
+fi
 
-[[ -f "$BASE_DIR/Helpers/config.json" ]] || \
-error "Validation failed" "config.json is missing" "Check file generation"
+if [[ ! -f "$BASE_DIR/Helpers/config.json" ]]; then
+    error "Missing file" "config.json not found" "Check generation step"
+fi
 
-[[ -f "$BASE_DIR/reports/reports.log" ]] || \
-error "Validation failed" "reports.log is missing" "Check file generation"
+if [[ ! -f "$BASE_DIR/reports/reports.log" ]]; then
+    error "Missing file" "reports.log not found" "Check generation step"
+fi
 
-echo "✅ Structure validation passed"
+success "Structure validated"
 
+# =========================
+# FINAL OUTPUT
+# =========================
 echo ""
-echo "================================================="
-echo "6. SUCCESS"
-echo "================================================="
+echo -e "${GREEN}======================================${NC}"
+echo -e "${GREEN}   PROJECT CREATED SUCCESSFULLY      ${NC}"
+echo -e "${GREEN}======================================${NC}"
+echo ""
 
-echo "✅ Project created successfully"
-echo ""
-echo "Project location:"
-echo "$BASE_DIR"
-echo ""
-echo "Run the application with:"
+success "Setup complete"
+info "Location: $BASE_DIR"
+info "Run commands:"
 echo "cd $BASE_DIR"
 echo "python3 attendance_checker.py"
 echo ""
-echo "✅ System ready"
+
+echo -e "${GREEN}SYSTEM READY 🚀${NC}"
