@@ -163,7 +163,7 @@ Once the environment is set up, `attendance_checker.py`:
 
 ## Repository
 
-**Repo name format:** `deploy_agent_{GitHubUsername}`
+**Repo name format:** `deploy_agent_Kubanaherve`
 
 ---
 
