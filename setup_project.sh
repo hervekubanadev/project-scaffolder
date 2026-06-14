@@ -21,4 +21,4 @@ echo "📁 Creating project structure..."
 mkdir -p "$BASE_DIR/Helpers"
 mkdir -p "$BASE_DIR/reports"
 
-echo "✔ Project directories created at $BASE_DIR"
+echo "✅ Project directories created at $BASE_DIR"
