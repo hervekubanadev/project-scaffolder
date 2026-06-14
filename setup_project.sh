@@ -290,5 +290,5 @@ echo ""
 echo ""
 
 run "=============================================="
-run "Creaated & Designed by  Herve Friend KUBANA 🎊"
+run "Created & Designed by  Herve Friend KUBANA 🎊"
 run "=============================================="
