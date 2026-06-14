@@ -1,86 +1,169 @@
 
+# Attendance Tracker – Project Bootstrapper
+### Automated Environment Setup via Shell Scripting | Infrastructure as Code (IaC)
 
-Attendance Tracker – Project Bootstrapper
-Overview
-This project is a small automation system I built to remove the need for manual setup when starting an attendance tracking application. Instead of creating folders, files, and configurations one by one, the entire environment is generated automatically using a single shell script.
-The goal is to demonstrate how Infrastructure as Code (IaC) can make setup faster, more reliable, and less error-prone.
+---
 
-⸻
+## Overview
 
-What This Project Does
-When the script runs, it:
-* Creates a full project folder named attendance_tracker_{your_input}
-* Builds the required structure:
-    * attendance_checker.py (main logic)
-    * Helpers/ (contains CSV data and config file)
-    * reports/ (stores generated logs)
-* Generates sample student attendance data
-* Creates a configuration file for system settings
-* Runs validation checks before completion
-It also includes a Python program that:
-* Reads student attendance data
-* Calculates attendance percentage
-* Flags students as WARNING or URGENT based on thresholds
-* Writes results into a log file
+This project eliminates manual project setup by using a single shell script to bootstrap a complete attendance tracking environment. Every folder, file, and configuration is generated automatically, validated, and ready to run — in seconds.
 
-⸻
+This demonstrates a core principle of professional software engineering: **Infrastructure as Code (IaC)** — where environment setup is reproducible, reliable, and free from human error.
 
-How to Use It
-Run the setup script:
+---
+
+## Project Structure Generated
+
+```
+attendance_tracker_{input}/
+├── attendance_checker.py       # Main Python logic engine
+├── Helpers/
+│   ├── assets.csv              # Student attendance data
+│   └── config.json             # Threshold configuration
+└── reports/
+    └── reports.log             # Auto-generated attendance report
+```
+
+---
+
+## How to Run
+
+**1. Give the script execution permission:**
+```bash
 chmod +x setup_project.sh
+```
+
+**2. Run the bootstrapper:**
+```bash
 ./setup_project.sh
-You will be asked to:
-* Enter a project name
-* Set warning threshold (default 75%)
-* Set failure threshold (default 50%)
-After setup, enter the project folder and run:
+```
+
+**3. Follow the interactive prompts:**
+- Enter a project suffix (e.g. `COHORT_A`)
+- Set a warning threshold (0–100, default 75%)
+- Set a failure threshold (0–100, default 50%)
+
+**4. After setup completes, enter the project and run:**
+```bash
+cd attendance_tracker_{input}
 python3 attendance_checker.py
+```
 
-⸻
+---
 
-Key Features (Rubric Coverage)
-1. Directory Automation
-The script automatically builds the required folder structure and files. It prevents duplicates and stops execution if the project already exists.
+## Triggering the Archive / Safe Exit Feature
 
-⸻
+The script implements a **SIGINT signal trap** (Ctrl+C). To trigger it:
 
-2. Configuration & Validation
-* Prompts for thresholds using CLI input
-* Validates numeric values
-* Ensures failure threshold is lower than warning threshold
-* Updates configuration using sed
+1. Start the script normally: `./setup_project.sh`
+2. Enter a project name and proceed through setup
+3. At **any point during execution**, press `Ctrl+C`
 
-⸻
+**What happens:**
+```
+⚠ INTERRUPT DETECTED (CTRL + C)
+⏳ Starting safe shutdown procedure...
+✔ Project directory detected
+⏳ Creating backup archive...
+✔ Backup successful: attendance_tracker_{input}_archive.tar.gz
+⏳ Cleaning workspace...
+✔ Temporary files removed
+SAFE EXIT COMPLETED
+```
 
-3. Process Management (Signal Trap)
-If the script is interrupted (Ctrl + C):
-* It creates a backup archive of the current state
-* Deletes the incomplete project folder
-* Keeps the workspace clean
+The incomplete project folder is **deleted** and a `.tar.gz` archive of its current state is saved in the parent directory. This keeps the workspace clean while preserving whatever was generated before the interrupt.
 
-⸻
+---
 
-4. Environment Check
-Before setup, it checks if Python 3 is installed. If not, it stops execution with an error message.
+## Feature Breakdown
 
-⸻
+### 1. Directory Automation
+The script builds the exact required folder structure using `mkdir`. Before creation, it:
+- Rejects **empty project names** and re-prompts
+- Checks if the directory **already exists** and exits with an error to prevent overwriting existing work
+- Creates all subdirectories (`Helpers/`, `reports/`) and generates all required files in sequence
 
-5. Logging System
-The Python script generates attendance reports with timestamps and stores them in reports/reports.log. Old logs are automatically archived on new runs.
+### 2. Configuration & `sed` Editing
+The user is prompted to set two attendance thresholds via the `read` command. The script then uses `sed` to perform **in-place substitution** on `config.json`:
 
-⸻
+```bash
+sed -i "s/\"warning\": [0-9]*/\"warning\": $WARNING/" config.json
+sed -i "s/\"failure\": [0-9]*/\"failure\": $FAILURE/" config.json
+```
 
-What I Learned From This Project
-This project helped me understand:
-* How automation replaces manual setup work
-* How shell scripting can control full project lifecycles
-* How to handle system signals safely
-* How to connect Bash and Python in one workflow
-* How real software systems maintain structure and reliability
+This regex pattern matches the existing numeric value next to each key and replaces it with the user's input — without needing to rewrite the entire file.
 
-⸻
+**Input validation applied:**
+- Rejects non-numeric values (`dafa`, `abc`)
+- Rejects values outside the 0–100 range (`787`, `45566`)
+- Loops until a valid value is entered for each field
 
-Summary
-This project is a simple but realistic example of how production systems are built using automation. It turns a manual setup process into a fully repeatable, reliable pipeline with built-in validation, logging, and recovery.
+### 3. Process Management — Signal Trap
+The trap is registered at the top of the script using:
 
+```bash
+trap handle_interrupt SIGINT
+```
+
+The `handle_interrupt` function is called whenever `Ctrl+C` is pressed. It:
+1. Detects whether the project directory was already created
+2. Bundles it into a `.tar.gz` archive using `tar -czf`
+3. Deletes the incomplete directory using `rm -rf`
+4. Exits cleanly with status code `1`
+
+This was tested by interrupting at different stages — before directory creation, during file generation, and during configuration — confirming the trap handles all cases correctly.
+
+### 4. Environment Validation
+Before any files are created, the script runs:
+
+```bash
+python3 --version
+```
+
+If Python 3 is not found, the script prints an error and exits immediately — preventing setup from continuing in a broken environment.
+
+A final **file integrity check** also confirms all required files exist before declaring success.
+
+### 5. Python Attendance Engine
+Once the environment is set up, `attendance_checker.py`:
+- Reads student records from `assets.csv`
+- Calculates each student's attendance percentage: `(attended / total_sessions) * 100`
+- Flags students based on config thresholds:
+  - Below `failure` threshold → `URGENT` alert
+  - Below `warning` threshold → `WARNING` alert
+- Writes timestamped results to `reports/reports.log`
+- Archives previous log files automatically on each new run
+
+---
+
+## Edge Cases Handled
+
+| Scenario | Behavior |
+|---|---|
+| Empty project name entered | Rejected, re-prompted |
+| Project directory already exists | Script exits with error |
+| Non-numeric threshold entered | Rejected, re-prompted |
+| Threshold outside 0–100 | Rejected, re-prompted |
+| Ctrl+C before directory created | Exits cleanly, nothing to archive |
+| Ctrl+C after directory created | Archives state, deletes directory |
+| Python3 not installed | Script exits with warning before setup |
+
+---
+
+## What This Project Demonstrates
+
+- **Shell scripting** for full project lifecycle automation
+- **Signal handling** (`trap`, `SIGINT`) for safe process management
+- **Stream editing** (`sed`) for dynamic file configuration
+- **Input validation** to prevent bad data from entering the system
+- **Bash + Python integration** in a single automated workflow
+- **IaC principles** — one script, identical output every time
+
+---
+
+## Repository
+
+**Repo name format:** `deploy_agent_{GitHubUsername}`
+
+---
 
