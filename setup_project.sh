@@ -127,8 +127,9 @@ cleanup() {
 trap cleanup SIGINT
 
 
-echo ""
-echo "✅ Setup completed successfully."
+echo "-------------------------------------------------------"
+echo "---------------------SUCCESS 🎊------------------------"
+echo "            ✅ Setup completed successfully.           "
 
 
 echo "📁 Project created at: $BASE_DIR"
