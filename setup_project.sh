@@ -21,8 +21,9 @@ echo "📁 Creating project structure..."
 mkdir -p "$BASE_DIR/Helpers"
 mkdir -p "$BASE_DIR/reports"
 
-echo "✅ Project directories created at $BASE_DIR"
-
+echo "✅ Project directories created at $BASE_DIR ..."
+echo "------------------------------------------------"
+echo "------------------------------------------------"
 echo "🧾 Generating application files..."
 
 # Create assets.csv
@@ -49,4 +50,4 @@ JSON
 # Create reports log file
 touch "$BASE_DIR/reports/reports.log"
 
-echo "✔ Core files created successfully"
+echo "✅  Core files created successfully ..."
