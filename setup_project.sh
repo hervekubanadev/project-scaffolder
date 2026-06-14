@@ -130,3 +130,7 @@ trap cleanup SIGINT
 echo ""
 echo "✅ Setup completed successfully."
 
+
+echo "📁 Project created at: $BASE_DIR"
+echo "👉 You can now navigate into the project directory."
+
