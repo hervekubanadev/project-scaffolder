@@ -126,3 +126,7 @@ cleanup() {
 
 trap cleanup SIGINT
 
+
+echo ""
+echo "✅ Setup completed successfully."
+
