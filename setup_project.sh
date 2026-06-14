@@ -62,3 +62,18 @@ FAILURE=${FAILURE:-50}
 
 echo " ✅ Using thresholds -> Warning: $WARNING | Failure: $FAILURE"
 
+
+validate_number() {
+  if ! [[ "$1" =~ ^[0-9]+$ ]]; then
+    echo " ❌ Error: threshold must be a numeric value"
+    exit 1
+  fi
+}
+
+echo " 🔍 Validating inputs..."
+
+validate_number "$WARNING"
+validate_number "$FAILURE"
+
+echo " ✅ Inputs validated successfully"
+
