@@ -166,4 +166,18 @@ Once the environment is set up, `attendance_checker.py`:
 **Repo name format:** `deploy_agent_Kubanaherve`
 
 ---
+Walkthrough Video
 
+Project explanation and demonstration video:
+
+[https://drive.google.com/file/d/1ZdsgCY2w2n_k4sz24ICjZlzRObNx--do/view?usp=sharing](https://drive.google.com/file/d/1ZdsgCY2w2n_k4sz24ICjZlzRObNx--do/view?usp=sharing)
+
+The video explains:
+
+* Project structure creation
+* Shell scripting logic
+* sed configuration updates
+* Signal trapping with Ctrl + C
+* Archive generation
+* Environment validation
+* Final execution demo
