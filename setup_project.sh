@@ -1,4 +1,41 @@
 #!/bin/bash
+set -euo pipefail
+
+# shellcheck shell=bash
+# shellcheck disable=SC2312
+
+# =========================
+# USAGE
+# =========================
+usage() {
+    cat <<EOF
+Usage: $(basename "$0") [OPTIONS]
+
+Generate an attendance tracker project scaffold.
+
+Options:
+  --help       Show this help message and exit
+  -v, --verbose  Enable verbose debug output
+
+EOF
+    exit 0
+}
+
+# Parse options
+VERBOSE=false
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --help) usage ;;
+        -v|--verbose) VERBOSE=true; shift ;;
+        *) echo "Unknown option: $1" >&2; usage ;;
+    esac
+done
+
+debug() {
+    if [[ "$VERBOSE" == true ]]; then
+        echo -e "${CYAN}[DEBUG] $1${NC}" >&2
+    fi
+}
 
 # =========================
 # COLORS
@@ -56,6 +93,8 @@ cleanup() {
 
 trap cleanup SIGINT
 
+debug "Signal handler installed for SIGINT"
+
 # =========================
 # HEADER
 # =========================
@@ -63,6 +102,7 @@ echo ""
 echo -e "${BLUE}======================================${NC}"
 echo -e "${BLUE}  ATTENDANCE TRACKER BOOTSTRAPPER    ${NC}"
 echo -e "${BLUE}======================================${NC}"
+debug "Verbose mode enabled"
 
 # =========================
 # INPUT PHASE
@@ -72,6 +112,7 @@ step "PROJECT INITIALIZATION"
 while true; do
     read -p "Enter the school/institution name : " PROJECT_NAME
     run "Validating school name"
+    debug "PROJECT_NAME='${PROJECT_NAME}'"
     if [[ -n "$PROJECT_NAME" ]]; then
         ok "School name accepted"
         break
@@ -83,8 +124,9 @@ done
 BASE_DIR="attendance_tracker_${PROJECT_NAME}"
 
 run "Checking project collision"
+debug "Checking for existing directory: $BASE_DIR"
 if [[ -d "$BASE_DIR" ]]; then
-    fail "Directory '$BASE_DIR' already exists"
+    fail "Directory '$BASE_DIR' already exists (exit code 1)"
     exit 1
 fi
 ok "No conflicts found"
@@ -96,9 +138,11 @@ step "ENVIRONMENT CHECK"
 run "Checking Python3 installation"
 if python3 --version >/dev/null 2>&1; then
     PY_VER=$(python3 --version 2>&1)
+    debug "Python binary found at: $(command -v python3)"
     ok "Python3 detected: ${PY_VER}"
 else
     warn "Python3 is not installed - the application requires Python 3"
+    debug "Ensure python3 is on PATH or install with: brew install python3"
 fi
 
 # =========================
@@ -107,23 +151,24 @@ fi
 step "PROJECT STRUCTURE CREATION"
 
 run "Creating base directory"
+debug "mkdir -p \"$BASE_DIR\""
 if ! mkdir -p "$BASE_DIR" 2>/dev/null; then
-    fail "Permission denied: cannot create directory '$BASE_DIR'"
-    exit 1
+    fail "Permission denied: cannot create directory '$BASE_DIR' (exit code 2)"
+    exit 2
 fi
 ok "Base directory created"
 
 run "Creating Helpers folder"
 if ! mkdir -p "$BASE_DIR/Helpers" 2>/dev/null; then
-    fail "Permission denied: cannot create Helpers directory"
-    exit 1
+    fail "Permission denied: cannot create Helpers directory (exit code 2)"
+    exit 2
 fi
 ok "Helpers created"
 
 run "Creating reports folder"
 if ! mkdir -p "$BASE_DIR/reports" 2>/dev/null; then
-    fail "Permission denied: cannot create reports directory"
-    exit 1
+    fail "Permission denied: cannot create reports directory (exit code 2)"
+    exit 2
 fi
 ok "Reports created"
 
@@ -133,6 +178,7 @@ ok "Reports created"
 step "FILE GENERATION"
 
 run "Writing assets.csv"
+debug "Creating $BASE_DIR/Helpers/assets.csv"
 cat <<CSV > "$BASE_DIR/Helpers/assets.csv"
 Email,Names,Attendance Count,Absence Count
 alice@example.com,Alice Johnson,14,1
@@ -143,6 +189,7 @@ CSV
 ok "assets.csv created"
 
 run "Writing config.json"
+debug "Creating $BASE_DIR/Helpers/config.json"
 cat <<JSON > "$BASE_DIR/Helpers/config.json"
 {
   "thresholds": {
@@ -156,6 +203,7 @@ JSON
 ok "config.json created"
 
 run "Writing attendance_checker.py"
+debug "Creating $BASE_DIR/attendance_checker.py"
 cat <<'PY' > "$BASE_DIR/attendance_checker.py"
 import csv
 import json
@@ -233,10 +281,11 @@ while true; do
             WARNING_INPUT="${WARNING_INPUT:-$WARNING}"
             if [[ "$WARNING_INPUT" =~ ^[0-9]+$ ]] && (( WARNING_INPUT >= 0 && WARNING_INPUT <= 100 )); then
                 WARNING=$WARNING_INPUT
+                debug "Warning threshold set to $WARNING"
                 ok "Warning threshold set to ${WARNING}%"
                 break
             else
-                fail "Invalid: enter a whole number between 0 and 100"
+                fail "Invalid: enter a whole number between 0 and 100 (got '${WARNING_INPUT}')"
             fi
         done
 
@@ -246,13 +295,14 @@ while true; do
             if [[ "$FAILURE_INPUT" =~ ^[0-9]+$ ]] && (( FAILURE_INPUT >= 0 && FAILURE_INPUT <= 100 )); then
                 if (( FAILURE_INPUT < WARNING )); then
                     FAILURE=$FAILURE_INPUT
+                    debug "Failure threshold set to $FAILURE"
                     ok "Failure threshold set to ${FAILURE}%"
                     break
                 else
                     warn "Failure (${FAILURE_INPUT}) must be less than Warning (${WARNING})"
                 fi
             else
-                fail "Invalid: enter a whole number between 0 and 100"
+                fail "Invalid: enter a whole number between 0 and 100 (got '${FAILURE_INPUT}')"
             fi
         done
 
@@ -261,12 +311,14 @@ while true; do
         warn "Using default thresholds: Warning = ${WARNING}% | Failure = ${FAILURE}%"
         break
     else
-        fail "Please enter Y or N"
+        fail "Please enter Y or N (got '${CHOICE}')"
     fi
 done
 
 run "Applying configuration to config.json"
 JSON_FILE="$BASE_DIR/Helpers/config.json"
+debug "Detected OS: $(uname)"
+debug "Applying warning=$WARNING, failure=$FAILURE to $JSON_FILE"
 if [[ "$(uname)" == "Darwin" ]]; then
     sed -i '' "s/\"warning\": [0-9]*/\"warning\": $WARNING/" "$JSON_FILE"
     sed -i '' "s/\"failure\": [0-9]*/\"failure\": $FAILURE/" "$JSON_FILE"
@@ -290,16 +342,17 @@ for file in \
     "$BASE_DIR/reports/reports.log"
 do
     if [[ -f "$file" ]]; then
-        ok "Found $(basename $file)"
+        debug "$file exists"
+        ok "Found $(basename "$file")"
     else
-        fail "Missing $(basename $file)"
+        fail "Missing $(basename "$file")"
         MISSING=1
     fi
 done
 
 if [[ MISSING -eq 1 ]]; then
-    fail "Some required files are missing - setup incomplete"
-    exit 1
+    fail "Some required files are missing - setup incomplete (exit code 3)"
+    exit 3
 fi
 
 # =========================
